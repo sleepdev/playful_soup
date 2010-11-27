@@ -1,0 +1,6 @@
+
+Playful Soup
+    - Beautiful Soup based robust parsing and DOM manipulation
+    - jQuery style selectors
+    - point free style (commands work like bash "pipes")
+    - tornado.httpclient based asynchronous request processing
