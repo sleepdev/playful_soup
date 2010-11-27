@@ -2,27 +2,70 @@
 import BeautifulSoup
 import httpclient
 
-def crawl( commands ):
-    "crawl (list) -> None \n"
-    "chain several commands together to form a workflow"
-    pass
 
-def load_page( url ):
-    "load_page (string) -> dict \n"
-    "retrieve text of page given by url"
-    pass
+def jumpto( url ):
+    "start spidering website"
+    def f( context, document, commands ):
+        pass
+    return f
 
-def follow_links( document, selector="a :href", data_selectors={} ):
-    "follow_links([string],[dict]) -> (dict) -> [dict] \n"
-    "extract links from text, optionally filtered by a pattern, and yield the text of the retrieved pages"
-    pass
 
-def extract( data_selectors={} ):
-    "extract (dict) -> (dict) \n"
-    "extract data from page and add to context"
+def select( selector="" ):
+    "jQuery style selector"
+    def f( context, document, commands ):
+        pass #TODO
+    return f
 
-def cleanse():
+
+
+def extract( selectors=[] ):
+    "extract data from document and add to context"
+    def f( context, document, commands ):
+        new_context = {}
+        new_context.update( context )
+        for k in data_selectors:
+            if isinstance(data_selectors[k],k):
+                new_context[k] = select(document,data_selectors[k])
+            else
+                for v in data_selectors[k]:
+                    new_context[k] = select(document,v)
+        return [(new_context,document)]
+    return f
+
+
+
+def follow( selector="" ):
+    "follow link to new document"
+    def f( context, document, commands ):
+        return [
+            ( ctx, httpclient.HTTPClient().fetch(url).body ) 
+            for (ctx,url) in select(selector)( context, document )
+        ]
+    return f
+
+
+
+def cleanse( post, format ):
     "format and validate data before submitting to a data sink"
-    pass
+    def f( context, document, commands ):
+        assert len(commands)==0
+        pass
+    return f
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
