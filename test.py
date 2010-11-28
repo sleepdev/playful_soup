@@ -10,11 +10,11 @@ data_sources = [
     [   
         jumpto  ( "http://shop.thehundreds.com/" ),
 
-        select  ( 'a[href^="~c-"]' ),
+        select  ( 'a[href^="c-"]' ),
         extract ( {"tags":"[innerHTML]"} ),
         follow  ( "[href]" ),
 
-        select  ( 'a[href^="~p-"]' ),
+        select  ( 'a[href^="p-"]' ),
         extract ( {"url":"[href]"} ),
         follow  ( "[href]" ),
 
@@ -23,7 +23,7 @@ data_sources = [
             "image_url": "div#item_color img [src]",
             "price": [  'span.SalePrice [innerHTML] ~"[0-9]+\\.[0-9]{2}"', 
                         'span.RegularPrice [innerHTML] ~"[0-9]+\\.[0-9]{2}"' ],
-            "description": "div#desc p.MsoNormal:nth-child(0)",
+            "description": "div#desc p.MsoNormal!0",
         } ),
         cleanse ( save_data, "url image_url[] title price description tags[]" )
     ],

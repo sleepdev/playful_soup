@@ -82,12 +82,13 @@ def _select( document, selector ):
                 op   = m.group('op')
                 pat  = json.loads(m.group('pat'))
  
-                if not isinstance(pat,str): raise Exception("Invalid Selector: %s" % this)
-                if op=='=':    kwargs[attr] = (lambda a: a==pat)
-                elif op=='~=': kwargs[attr] = (lambda a: pat in a.split(' '))
-                elif op=='^=': kwargs[attr] = (lambda a: a.startswith(pat) )
-                elif op=='$=': kwargs[attr] = (lambda a: a.endswith(pat) )
-                elif op=='|=': kwargs[attr] = (lambda a: pat in a.split('-'))
+                if not (isinstance(pat,str) or isinstance(pat,unicode)): 
+                    raise Exception("Invalid Selector: %s" % this)
+                if op=='=':    kwargs[attr] = (lambda a: a and a==pat)
+                elif op=='~=': kwargs[attr] = (lambda a: a and pat in a.split(' '))
+                elif op=='^=': kwargs[attr] = (lambda a: a and a.startswith(pat) )
+                elif op=='$=': kwargs[attr] = (lambda a: a and a.endswith(pat) )
+                elif op=='|=': kwargs[attr] = (lambda a: a and pat in a.split('-'))
                 else: raise Exception("Invalid Selector: %s" % this)
             else:   
                 raise Exception("Invalid Selector: %s" % this)
