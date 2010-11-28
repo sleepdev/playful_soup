@@ -1,13 +1,13 @@
 
 import BeautifulSoup
-import httpclient
+import tornado.httpclient
 import re
 
 
 def jumpto( url ):
     "start spidering website"
     def f( context, document, commands ):
-        doc = httpclient.HTTPClient().fetch(url).body
+        doc = tornado.httpclient.HTTPClient().fetch(url).body
         return commands[0]( context, doc, commands[1:] )
     return f
 
@@ -60,8 +60,8 @@ def _select( selector, context, document ):
 def select( selector="" ):
     "jQuery style selector"
     def f( context, document, commands ):
-        for (ctx,doc) in _select(selector)( context, document ):
-            yield commands[0](ctx,doc,commands[1:])
+        for doc in _select(selector, context, document ):
+            yield commands[0](context,doc,commands[1:])
     return f
 
 
@@ -74,7 +74,7 @@ def extract( selectors=[] ):
         for k in data_selectors:
             if isinstance(data_selectors[k],k):
                 new_context[k] = select(document,data_selectors[k])
-            else
+            else:
                 for v in data_selectors[k]:
                     new_context[k] = select(document,v)
         return commands[0]( new_context, document, commands[1:] )
@@ -85,9 +85,9 @@ def extract( selectors=[] ):
 def follow( selector="" ):
     "follow link to new document"
     def f( context, document, commands ):
-        for (ctx,url) in _select(selector)( context, document ):
+        for url in _select(selector, context, document ):
             try:
-                doc = httpclient.HTTPClient().fetch(url).body
+                doc = tornado.httpclient.HTTPClient().fetch(url).body
                 yield commands[0](ctx,doc,commands[1:])
             except httpclient.HTTPError:
                 pass
