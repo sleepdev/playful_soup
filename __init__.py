@@ -193,25 +193,26 @@ def cleanse( post, format ):
     @typecheck(dict,str,list)
     def f( context, document, commands ):
         assert len(commands)==0
-        kwargs = {}
-        attrs = format.split()
-        for a in attrs:
-            if a.endswith('[]'):
-                a = a[:-2]
-                if a not in context:  context[a] = None
-                assert isinstance(context[a],list)
-                assert all( isinstance(x,str) for x in context[a] )
-                kwargs[a] = context[a]
-            else:
-                if a not in context:  context[a] = None
-                elif isinstance(context[a],list):
-                    assert len(context[a]) >= 1
+        try:
+            kwargs = {}
+            attrs = format.split()
+            for a in attrs:
+                if a.endswith('[]'):
+                    a = a[:-2]
+                    assert isinstance(context[a],list)
                     assert all( isinstance(x,str) for x in context[a] )
-                    kwargs[a] = context[a][0]
-                else:
-                    assert isinstance(context[a],str)
                     kwargs[a] = context[a]
-        post( **kwargs )
+                else:
+                    if isinstance(context[a],list):
+                        assert len(context[a]) >= 1
+                        assert all( isinstance(x,str) for x in context[a] )
+                        kwargs[a] = context[a][0]
+                    else:
+                        assert isinstance(context[a],str)
+                        kwargs[a] = context[a]
+            post( **kwargs )
+        except:
+            pass
     return f
 
 
