@@ -2,9 +2,13 @@
 import BeautifulSoup
 import json
 import re
+import time
+import tornado.escape
 import tornado.httpclient
 import types
+import urlparse
 
+utf8 = tornado.escape.utf8
 Soup = BeautifulSoup.BeautifulSoup
 
 def typecheck( *types ):
@@ -29,8 +33,20 @@ def jumpto( url ):
     
     @typecheck( dict, str, list )
     def f( context, document, commands ):
-        doc = tornado.httpclient.HTTPClient().fetch(url).body
-        return commands[0]( context, doc, commands[1:] )
+        if '://' not in url:
+            _url = urlparse.urljoin( context['base_url'], url )  
+        else:
+            _url = url
+
+        parsed_url = urlparse.urlparse(_url)
+        context['url'] = _url
+        context['base_url'] = parsed_url.scheme + '://' + parsed_url.netloc
+        try:
+            time.sleep(1)
+            doc = tornado.httpclient.HTTPClient().fetch(_url).body
+            return commands[0]( context, doc, commands[1:] )
+        except tornado.httpclient.HTTPError, x:
+            print x
     return f
 
 
@@ -42,47 +58,62 @@ def _select( document, selector ):
     if selector=='':
         return [document]
 
+    if selector=='[innerHTML]':
+        try:
+            return [''.join( str(c) for c in Soup(document).contents[0].contents )]
+        except Exception, x:
+            print x
+            return []       
+
     if ' ' in selector:
         this,next = selector.split(' ',1)
     else:
         this,next = selector,''
 
 
-    if selector=="[innerHTML]":
+    if re.match('^![0-9]+$',this):
         try:
-            return [''.join( str(c) for c in Soup(document).contents[0].contents )]
-        except Exception, x:
+            return _select( str(Soup(document).contents[0].contents[int(this[1:])]) ,next)
+        except IndexError,x:
             print x
             return []
-    elif re.match("\\[[a-zA-Z]+\\]",selector):
-        return [ Soup(document).contents[0][selector[1:-1]] ]
+    elif re.match("^\\[[a-zA-Z]+\\]$",this):
+        return [str( Soup(document).contents[0][this[1:-1]] )]
     else:
-
         tag     = re.compile('[a-zA-Z]+')
         hasattr = re.compile('\\[(?P<attr>[a-zA-Z]+)\\]')
         rgxattr = re.compile('\\[(?P<attr>[a-zA-Z]+)(?P<op>[^\\"]+)(?P<pat>[^\\]]+)\\]')
-        id      = re.compile('#(?P<id>[a-zA-Z]+)')
-        cls     = re.compile('\\.(?P<class>[a-zA-Z]+)')
+        id      = re.compile('#(?P<id>[_a-zA-Z0-9]+)')
+        cls     = re.compile('\\.(?P<class>[_a-zA-Z0-9]+)')
+        ind     = re.compile('![0-9]+')
 
         m = tag.match(this)
         if m:
             name = this[ :m.end() ]
             this = this[ m.end(): ]
         else:
+            if this.startswith('*'):
+                this = this[1:]
             name = True
-
+        
         kwargs = {}
         while this!="":
-            if hasattr.match(this):   kwargs[hasattr.match(this).group('attr')] = True
-            elif id.match(this):      kwargs["id"] = id.match(this).group('id')
-            elif cls.match(this):     kwargs["class"] = cls.match(this).group('class')
+            if hasattr.match(this):
+                m = hasattr.match(this)   
+                kwargs[m.group('attr')] = True
+            elif id.match(this):      
+                m = id.match(this)
+                kwargs["id"] = m.group('id')
+            elif cls.match(this):
+                m = cls.match(this)
+                kwargs["class"] = cls.match(this).group('class')
             elif rgxattr.match(this):
                 m    = rgxattr.match(this)
                 attr = m.group('attr')
                 op   = m.group('op')
-                pat  = json.loads(m.group('pat'))
+                pat  = str(json.loads(m.group('pat')))
  
-                if not (isinstance(pat,str) or isinstance(pat,unicode)): 
+                if not isinstance(pat,str): 
                     raise Exception("Invalid Selector: %s" % this)
                 if op=='=':    kwargs[attr] = (lambda a: a and a==pat)
                 elif op=='~=': kwargs[attr] = (lambda a: a and pat in a.split(' '))
@@ -128,18 +159,15 @@ def extract( selectors ):
     return f
 
 
+
 @typecheck(str)
 def follow( selector ):
     "follow link to new document"
     def f( context, document, commands ):
         for url in _select( document, selector ):
-            try:
-                print "follow %s" % url
-                doc = tornado.httpclient.HTTPClient().fetch(url).body
-                commands[0](ctx,doc,commands[1:])
-            except tornado.httpclient.HTTPError, x:
-                print x
+           jumpto(url)(context,document,commands)
     return f
+
 
 
 
@@ -148,7 +176,7 @@ def cleanse( post, format ):
     "format and validate data before submitting to a data sink"
     def f( context, document, commands ):
         assert len(commands)==0
-        print context, document
+        print context
     return f
 
 
