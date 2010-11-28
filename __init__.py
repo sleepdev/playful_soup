@@ -1,10 +1,11 @@
 
 import BeautifulSoup
+import json
 import re
 import tornado.httpclient
 import types
 
-
+Soup = BeautifulSoup.BeautifulSoup
 
 def typecheck( *types ):
     def check( f ):
@@ -37,24 +38,31 @@ def jumpto( url ):
 @typecheck( str, str )
 def _select( document, selector ):
     "jQuery style selectors"
-    #print "_select: %s %s" % (document, selector)
 
     if selector=='':
-        return document
+        return [document]
 
     if ' ' in selector:
         this,next = selector.split(' ',1)
     else:
         this,next = selector,''
 
+
     if selector=="[innerHTML]":
-        print "[innerHTML]", document
-        return [''.join( str(c) for c in BeautifulSoup.BeautifulSoup(document).contents[0].contents )]
+        try:
+            return [''.join( str(c) for c in Soup(document).contents[0].contents )]
+        except Exception, x:
+            print x
+            return []
+    elif re.match("\\[[a-zA-Z]+\\]",selector):
+        return [ Soup(document).contents[0][selector[1:-1]] ]
     else:
+
         tag     = re.compile('[a-zA-Z]+')
-        attr    = re.compile('\\[[a-zA-Z]+([^\\"\\]]+(\\"[^\\"]*\\"))\\]')
-        id      = re.compile('#[a-zA-Z]+')
-        cls     = re.compile('\\.[a-zA-Z]+')
+        hasattr = re.compile('\\[(?P<attr>[a-zA-Z]+)\\]')
+        rgxattr = re.compile('\\[(?P<attr>[a-zA-Z]+)(?P<op>[^\\"]+)(?P<pat>[^\\]]+)\\]')
+        id      = re.compile('#(?P<id>[a-zA-Z]+)')
+        cls     = re.compile('\\.(?P<class>[a-zA-Z]+)')
 
         m = tag.match(this)
         if m:
@@ -65,23 +73,29 @@ def _select( document, selector ):
 
         kwargs = {}
         while this!="":
-            if attr.match(this):    
-                m = attr.match(this)
-                attr_match = this[ 1:m.end()-1 ]
-                assert tag.match(attr_match), 'Complicated attribute selectors not implemented %s' % attr_match
-                this = this[ m.end(): ]
-            elif id.match(this):    
-                m = id.match(this)
-                kwargs["id"] = this[ 1:m.end() ]
-                this = this[ m.end(): ]
-            elif cls.match(this):   
-                m = cls.match(this)
-                kwargs["class"] = this[ 1:m.end() ]
+            if hasattr.match(this):   kwargs[hasattr.match(this).group('attr')] = True
+            elif id.match(this):      kwargs["id"] = id.match(this).group('id')
+            elif cls.match(this):     kwargs["class"] = cls.match(this).group('class')
+            elif rgxattr.match(this):
+                m    = rgxattr.match(this)
+                attr = m.group('attr')
+                op   = m.group('op')
+                pat  = json.loads(m.group('pat'))
+ 
+                if not isinstance(pat,str): raise Exception("Invalid Selector: %s" % this)
+                if op=='=':    kwargs[attr] = (lambda a: a==pat)
+                elif op=='~=': kwargs[attr] = (lambda a: pat in a.split(' '))
+                elif op=='^=': kwargs[attr] = (lambda a: a.startswith(pat) )
+                elif op=='$=': kwargs[attr] = (lambda a: a.endswith(pat) )
+                elif op=='|=': kwargs[attr] = (lambda a: pat in a.split('-'))
+                else: raise Exception("Invalid Selector: %s" % this)
             else:   
                 raise Exception("Invalid Selector: %s" % this)
-        
-        print "select",name,kwargs 
-        return reduce(lambda a,b: a+b, (_select(str(o),next) for o in BeautifulSoup.BeautifulSoup(document).findAll( name, kwargs )) )
+            this = this[ m.end(): ]
+         
+        return reduce(lambda a,b: a+b, (_select(str(o),next) for o in Soup(document).findAll( name, kwargs )), [] )
+
+
             
 
 @typecheck( str )
@@ -90,7 +104,6 @@ def select( selector ):
     @typecheck(dict,str,list)
     def f( context, document, commands ):
         for doc in _select( document, selector ):
-            print doc
             commands[0](context,doc,commands[1:])
     return f
 
@@ -118,12 +131,13 @@ def extract( selectors ):
 def follow( selector ):
     "follow link to new document"
     def f( context, document, commands ):
-        for url in _select( selector, document ):
+        for url in _select( document, selector ):
             try:
+                print "follow %s" % url
                 doc = tornado.httpclient.HTTPClient().fetch(url).body
                 commands[0](ctx,doc,commands[1:])
-            except httpclient.HTTPError:
-                pass
+            except tornado.httpclient.HTTPError, x:
+                print x
     return f
 
 
@@ -138,6 +152,7 @@ def cleanse( post, format ):
 
 
 
+@typecheck(list)
 def crawl( site ):
     site[0]( {}, "", site[1:] )
 
