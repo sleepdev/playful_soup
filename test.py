@@ -1,8 +1,17 @@
 
 from __init__ import jumpto, select, extract, follow, cleanse, crawl
+import sys
+
 
 def save_data( **kwargs ):
-    print kwargs
+    for k in kwargs:
+        if kwargs[k]==None: 
+            print '%s : None' % k
+        elif len(kwargs[k])<200:
+            print '%s : %s' % (k,kwargs[k])
+        else:
+            print '%s : %s' % (k,kwargs[k][:197]+'...')
+    print '\n'
 
 data_sources = [
 
@@ -15,14 +24,12 @@ data_sources = [
         follow  ( "[href]" ),
 
         select  ( 'a[href^="p-"]' ),
-        extract ( {"url":"[href]"} ),
         follow  ( "[href]" ),
 
         extract ( { 
-            "title": "td.prodinfo [innerHTML]",
+            "title": "td.prodinfo h2 [innerHTML]",
             "image_url": "div#item_color img [src]",
-            "price": [ 'span.SalePrice [innerHTML] ~"[0-9]+\\.[0-9]{2}"', 
-                        'span.RegularPrice [innerHTML] ~"[0-9]+\\.[0-9]{2}"' ],
+            "price": 'span.price [innerHTML]',
             "description": "div#desc p.MsoNormal !0",
         } ),
         cleanse ( save_data, "url image_url[] title price description tags[]" )

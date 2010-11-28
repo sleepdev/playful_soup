@@ -17,14 +17,25 @@ def typecheck( *types ):
             try:
                 assert len(types)==len(args)
                 assert all( isinstance(t,T) for t,T in zip(args,types) )
-                return f( *args )
             except AssertionError:
                 raise TypeError("Expected %s but got %s" % 
-                    ( types, [t.__class__ for t in args] ) 
+                    ( types, tuple(t.__class__ for t in args) ) 
                 )
+            return f( *args )
         return inner
     return check
 
+def returns( type, description="?" ):
+    def check( f ):
+        def inner( *args ):
+            try:
+                ret = f(*args)
+                assert type( ret )
+                return ret
+            except AssertionError:
+                raise TypeError("Expected %s but returned %s" % (description,ret.__class__))
+        return inner
+    return check
 
 
 @typecheck( str )
@@ -34,13 +45,13 @@ def jumpto( url ):
     @typecheck( dict, str, list )
     def f( context, document, commands ):
         if '://' not in url:
-            _url = urlparse.urljoin( context['base_url'], url )  
+            _url = urlparse.urljoin( context['base_url'][0], url )  
         else:
             _url = url
 
         parsed_url = urlparse.urlparse(_url)
-        context['url'] = _url
-        context['base_url'] = parsed_url.scheme + '://' + parsed_url.netloc
+        context['url'] = [_url]
+        context['base_url'] = [parsed_url.scheme + '://' + parsed_url.netloc]
         try:
             time.sleep(1)
             doc = tornado.httpclient.HTTPClient().fetch(_url).body
@@ -52,6 +63,7 @@ def jumpto( url ):
 
 
 @typecheck( str, str )
+@returns( (lambda a: isinstance(a,list) and all( isinstance(x,str) for x in a )), "[str]" )
 def _select( document, selector ):
     "jQuery style selectors"
 
@@ -80,7 +92,7 @@ def _select( document, selector ):
     elif re.match("^\\[[a-zA-Z]+\\]$",this):
         return [str( Soup(document).contents[0][this[1:-1]] )]
     else:
-        tag     = re.compile('[a-zA-Z]+')
+        tag     = re.compile('[a-zA-Z0-9]+')
         hasattr = re.compile('\\[(?P<attr>[a-zA-Z]+)\\]')
         rgxattr = re.compile('\\[(?P<attr>[a-zA-Z]+)(?P<op>[^\\"]+)(?P<pat>[^\\]]+)\\]')
         id      = re.compile('#(?P<id>[_a-zA-Z0-9]+)')
@@ -124,7 +136,7 @@ def _select( document, selector ):
             else:   
                 raise Exception("Invalid Selector: %s" % this)
             this = this[ m.end(): ]
-         
+        results = Soup(document).findAll( name, kwargs )         
         return reduce(lambda a,b: a+b, (_select(str(o),next) for o in Soup(document).findAll( name, kwargs )), [] )
 
 
@@ -152,9 +164,12 @@ def extract( selectors ):
             if isinstance(selectors[k],str):
                 new_context[k] = _select(document,selectors[k])
             else:
-                found = [ _select(document,v) for v in selectors[k] ]
-                found = [ v for v in found if v!=None ]
-                new_context[k] = found[0]
+                for v in selectors[k]:
+                    if v == None: continue
+                    found = _select(document,v)    
+                    if len(found)>= 1:
+                        new_context[k] = found
+                        break
         return commands[0]( new_context, document, commands[1:] )
     return f
 
@@ -163,6 +178,7 @@ def extract( selectors ):
 @typecheck(str)
 def follow( selector ):
     "follow link to new document"
+    @typecheck(dict,str,list)
     def f( context, document, commands ):
         for url in _select( document, selector ):
            jumpto(url)(context,document,commands)
@@ -174,9 +190,28 @@ def follow( selector ):
 @typecheck(types.FunctionType,str)
 def cleanse( post, format ):
     "format and validate data before submitting to a data sink"
+    @typecheck(dict,str,list)
     def f( context, document, commands ):
         assert len(commands)==0
-        print context
+        kwargs = {}
+        attrs = format.split()
+        for a in attrs:
+            if a.endswith('[]'):
+                a = a[:-2]
+                if a not in context:  context[a] = None
+                assert isinstance(context[a],list)
+                assert all( isinstance(x,str) for x in context[a] )
+                kwargs[a] = context[a]
+            else:
+                if a not in context:  context[a] = None
+                elif isinstance(context[a],list):
+                    assert len(context[a]) >= 1
+                    assert all( isinstance(x,str) for x in context[a] )
+                    kwargs[a] = context[a][0]
+                else:
+                    assert isinstance(context[a],str)
+                    kwargs[a] = context[a]
+        post( **kwargs )
     return f
 
 
