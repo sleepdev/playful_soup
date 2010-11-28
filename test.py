@@ -1,5 +1,5 @@
 
-from __init__ import jumpto, select, extract, follow, cleanse
+from __init__ import jumpto, select, extract, follow, cleanse, crawl
 
 def save_data( **kwargs ):
     print kwargs
@@ -32,5 +32,4 @@ data_sources = [
 
 if __name__=="__main__":
     for site in data_sources:
-        for _ in site[0]( {}, "", site[1:] ):
-            pass
+        crawl(site)
