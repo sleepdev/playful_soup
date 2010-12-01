@@ -8,6 +8,26 @@ import tornado.httpclient
 import types
 import urlparse
 
+"""
+Commands
+  jumpto   - start a crawler at the given urls (FIRST) 
+  follow   - select and follow links from body text
+  extract  - select and save data from body text
+  commit   - validate and send data (LAST)
+
+All commands take 1 application to configure and another to execute.
+The second application is given 3 arguments.
+  env : dict = the current environment of the crawler
+  body: str  = the current html being examined
+  cont: list = the list of commands to be applied to the results of this function
+"""
+
+
+
+
+
+
+
 utf8 = tornado.escape.utf8
 Soup = BeautifulSoup.BeautifulSoup
 
@@ -40,8 +60,7 @@ def returns( type, description="?" ):
 
 @typecheck( str )
 def jumpto( url ):
-    "start spidering a website"
-    
+    "start spidering a website"    
     @typecheck( dict, str, list )
     def f( context, document, commands ):
         if '://' not in url:
