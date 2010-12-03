@@ -74,7 +74,7 @@ def _select( document, selector ):
         try:
             return [str( Soup(document).contents[0].contents[int(selector[1:])] )]
         except IndexError,x:
-            print x
+            logging.error( str(x) )
             return []
 
     else:
@@ -174,7 +174,8 @@ def commit( post, format ):
                     assert all( isinstance(x,str) for x in context[a] )
                     kwargs[a] = context[a][0]
             post( **kwargs )
-        except:
+        except Exception,x:
+            logging.error( str(x) )
             print "Invalid Commit: ", context['url'][0]
     return f
 
