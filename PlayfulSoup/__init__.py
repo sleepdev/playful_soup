@@ -149,8 +149,6 @@ def follow( selector ):
     return f
 
 
-#DONE
-
 def commit( post, format ):
     "format and validate data before submitting to a data sink"
     def f( context, document, commands ):
@@ -160,21 +158,20 @@ def commit( post, format ):
             attrs = format.split()
             for a in attrs:
                 if a.endswith('[]'):
-                    a = a[:-2]
+                    assert a in context
                     assert isinstance(context[a],list)
                     assert all( isinstance(x,str) for x in context[a] )
+                    a = a[:-2]
                     kwargs[a] = context[a]
                 else:
-                    if isinstance(context[a],list):
-                        assert len(context[a]) >= 1
-                        assert all( isinstance(x,str) for x in context[a] )
-                        kwargs[a] = context[a][0]
-                    else:
-                        assert isinstance(context[a],str)
-                        kwargs[a] = context[a]
+                    assert a in context
+                    assert isinstance(context[a],list)
+                    assert len(context[a]) >= 1
+                    assert all( isinstance(x,str) for x in context[a] )
+                    kwargs[a] = context[a][0]
             post( **kwargs )
         except:
-            print "Invalid Commit: ", context['url']
+            print "Invalid Commit: ", context['url'][0]
     return f
 
 
