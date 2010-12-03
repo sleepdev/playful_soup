@@ -80,7 +80,7 @@ def _select( document, selector ):
     else:
     
         ops = [
-            [re.compile('(?P<name>[a-zA-Z0-9]+)'), (lambda g: {'$name$': g['name']}) ],
+            [re.compile('(?P<name>[-_a-zA-Z0-9]+)'), (lambda g: {'$name$': g['name']}) ],
             [re.compile('\\[(?P<attr>[a-zA-Z]+)\\]'), (lambda g: {g['attr']: True}) ],
             [re.compile('\\[(?P<attr>[a-zA-Z]+)(?P<op>[^\\"]+)(?P<pat>[^\\]]+)\\]'),
             (lambda g: 
@@ -91,8 +91,8 @@ def _select( document, selector ):
                 { g['attr']: (lambda a: a and g['pat'] in a.split('-')) }  if g['op']=='|=' else
                 {}
             )],
-            [re.compile('#(?P<id>[_a-zA-Z0-9]+)'), (lambda g: {'id': g['id']}) ],
-            [re.compile('\\.(?P<class>[_a-zA-Z0-9]+)'), (lambda g: {'class': g['class']}) ],
+            [re.compile('#(?P<id>[-_a-zA-Z0-9]+)'), (lambda g: {'id': g['id']}) ],
+            [re.compile('\\.(?P<class>[-_a-zA-Z0-9]+)'), (lambda g: {'class': g['class']}) ],
         ]
 
         kwargs = {}
