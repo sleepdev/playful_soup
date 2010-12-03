@@ -64,11 +64,15 @@ def _select( document, selector ):
             return []       
 
     elif re.match("^\\[[a-zA-Z]+\\]$",selector):
-        return [str( Soup(document).contents[0][selector[1:-1]] )]
+        try:
+            return [str( Soup(document).contents[0][selector[1:-1]] )]
+        except Exception, x:
+            logging.error( str(x) )
+            return []
 
     elif re.match('^![0-9]+$',selector):
         try:
-            return [ str(Soup(document).contents[0].contents[int(selector[1:])]) ]
+            return [str( Soup(document).contents[0].contents[int(selector[1:])] )]
         except IndexError,x:
             print x
             return []
@@ -80,11 +84,11 @@ def _select( document, selector ):
             [re.compile('\\[(?P<attr>[a-zA-Z]+)\\]'), (lambda g: {g['attr']: True}) ],
             [re.compile('\\[(?P<attr>[a-zA-Z]+)(?P<op>[^\\"]+)(?P<pat>[^\\]]+)\\]'),
             (lambda g: 
-                { g['attr']: (lambda a: a and a==pat) }                    if g['op']=='=' else
-                { g['attr']: (lambda a: a and pat in a.split(' ')) }       if g['op']=='~=' else
-                { g['attr']: (lambda a: a and a.startswith(pat)) }         if g['op']=='^=' else
-                { g['attr']: (lambda a: a and a.endswith(pat)) }           if g['op']=='$=' else
-                { g['attr']: (lambda a: a and pat in a.split('-')) }       if g['op']=='|=' else
+                { g['attr']: (lambda a: a and a==g['pat']) }               if g['op']=='=' else
+                { g['attr']: (lambda a: a and g['pat'] in a.split(' ')) }  if g['op']=='~=' else
+                { g['attr']: (lambda a: a and a.startswith(g['pat'])) }    if g['op']=='^=' else
+                { g['attr']: (lambda a: a and a.endswith(g['pat'])) }      if g['op']=='$=' else
+                { g['attr']: (lambda a: a and g['pat'] in a.split('-')) }  if g['op']=='|=' else
                 {}
             )],
             [re.compile('#(?P<id>[_a-zA-Z0-9]+)'), (lambda g: {'id': g['id']}) ],
