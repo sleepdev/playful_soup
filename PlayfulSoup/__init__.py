@@ -1,6 +1,7 @@
 
 import BeautifulSoup
 import json
+import logging
 import re
 import time
 import tornado.escape
@@ -12,72 +13,39 @@ import urlparse
 Commands
   jumpto   - start a crawler at the given urls (FIRST) 
   follow   - select and follow links from body text
-  extract  - select and save data from body text
+  extract  - select and save data from page text
   commit   - validate and send data (LAST)
 
 All commands take 1 application to configure and another to execute.
 The second application is given 3 arguments.
   env : dict = the current environment of the crawler
-  body: str  = the current html being examined
+  body: str  = the current page being examined
   cont: list = the list of commands to be applied to the results of this function
 """
-
-
-
-
 
 
 
 utf8 = tornado.escape.utf8
 Soup = BeautifulSoup.BeautifulSoup
 
-def typecheck( *types ):
-    def check( f ):
-        def inner( *args ):
-            try:
-                assert len(types)==len(args)
-                assert all( isinstance(t,T) for t,T in zip(args,types) )
-            except AssertionError:
-                raise TypeError("Expected %s but got %s" % 
-                    ( types, tuple(t.__class__ for t in args) ) 
-                )
-            return f( *args )
-        return inner
-    return check
-
-def returns( type, description="?" ):
-    def check( f ):
-        def inner( *args ):
-            try:
-                ret = f(*args)
-                assert type( ret )
-                return ret
-            except AssertionError:
-                raise TypeError("Expected %s but returned %s" % (description,ret.__class__))
-        return inner
-    return check
 
 
-@typecheck( str )
-def jumpto( urls* ):
+def jumpto( *urls ):
     "start spidering a website"    
-    @typecheck( dict, str, list )
     def f( context, document, commands ):
         for url in urls:
-            if '://' not in url:
-                _url = urlparse.urljoin( context['base_url'][0], url )  
-            else:
-                _url = url
 
-            parsed_url = urlparse.urlparse(_url)
-            context['url'] = [_url]
-            context['base_url'] = [parsed_url.scheme + '://' + parsed_url.netloc]
+            ctx = {}
+            ctx.update( context ) 
+            parsed_url = urlparse.urlparse(url)
+            ctx['url'] = [url]
+            ctx['base_url'] = [parsed_url.scheme + '://' + parsed_url.netloc]
             try:
                 time.sleep(1)
-                doc = tornado.httpclient.HTTPClient().fetch(_url).body
-                commands[0]( context, doc, commands[1:] )
+                doc = tornado.httpclient.HTTPClient().fetch(url).body
+                commands[0]( ctx, doc, commands[1:] )
             except tornado.httpclient.HTTPError, x:
-                print x
+                logging.error( str(x) )
     return f
 
 
@@ -178,6 +146,13 @@ def extract( selectors ):
                     if len(found)>= 1:
                         new_context[k] = found
                         break
+
+            if next_context[k].startswith('/'):
+                url = next_context[k]
+                if '://' not in url:
+                    assert 'base_url' in context
+                    next_context[k] = urlparse.urljoin( context['base_url'][0], url ) 
+
         commands[0]( new_context, document, commands[1:] )
     return f
 
@@ -220,10 +195,13 @@ def commit( post, format ):
                         kwargs[a] = context[a]
             post( **kwargs )
         except:
-            pass
+            print "Invalid Commit: ", context['url']
     return f
 
 
+@typecheck(list)
+def crawl( site ):
+  site[0]( {}, "", site[1:] )
 
 
 
