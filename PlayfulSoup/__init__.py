@@ -59,24 +59,25 @@ def returns( type, description="?" ):
 
 
 @typecheck( str )
-def jumpto( url ):
+def jumpto( urls* ):
     "start spidering a website"    
     @typecheck( dict, str, list )
     def f( context, document, commands ):
-        if '://' not in url:
-            _url = urlparse.urljoin( context['base_url'][0], url )  
-        else:
-            _url = url
+        for url in urls:
+            if '://' not in url:
+                _url = urlparse.urljoin( context['base_url'][0], url )  
+            else:
+                _url = url
 
-        parsed_url = urlparse.urlparse(_url)
-        context['url'] = [_url]
-        context['base_url'] = [parsed_url.scheme + '://' + parsed_url.netloc]
-        try:
-            time.sleep(1)
-            doc = tornado.httpclient.HTTPClient().fetch(_url).body
-            return commands[0]( context, doc, commands[1:] )
-        except tornado.httpclient.HTTPError, x:
-            print x
+            parsed_url = urlparse.urlparse(_url)
+            context['url'] = [_url]
+            context['base_url'] = [parsed_url.scheme + '://' + parsed_url.netloc]
+            try:
+                time.sleep(1)
+                doc = tornado.httpclient.HTTPClient().fetch(_url).body
+                commands[0]( context, doc, commands[1:] )
+            except tornado.httpclient.HTTPError, x:
+                print x
     return f
 
 
@@ -159,18 +160,6 @@ def _select( document, selector ):
         return reduce(lambda a,b: a+b, (_select(str(o),next) for o in Soup(document).findAll( name, kwargs )), [] )
 
 
-            
-
-@typecheck( str )
-def select( selector ):
-    "jQuery style selector"
-    @typecheck(dict,str,list)
-    def f( context, document, commands ):
-        for doc in _select( document, selector ):
-            commands[0](context,doc,commands[1:])
-    return f
-
-
 
 @typecheck(dict)
 def extract( selectors ):
@@ -189,7 +178,7 @@ def extract( selectors ):
                     if len(found)>= 1:
                         new_context[k] = found
                         break
-        return commands[0]( new_context, document, commands[1:] )
+        commands[0]( new_context, document, commands[1:] )
     return f
 
 
@@ -207,7 +196,7 @@ def follow( selector ):
 
 
 @typecheck(types.FunctionType,str)
-def cleanse( post, format ):
+def commit( post, format ):
     "format and validate data before submitting to a data sink"
     @typecheck(dict,str,list)
     def f( context, document, commands ):
@@ -234,11 +223,6 @@ def cleanse( post, format ):
             pass
     return f
 
-
-
-@typecheck(list)
-def crawl( site ):
-    site[0]( {}, "", site[1:] )
 
 
 
