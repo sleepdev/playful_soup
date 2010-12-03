@@ -34,7 +34,6 @@ def jumpto( *urls ):
     "start spidering a website"    
     def f( context, document, commands ):
         for url in urls:
-
             ctx = {}
             ctx.update( context ) 
             parsed_url = urlparse.urlparse(url)
@@ -48,84 +47,70 @@ def jumpto( *urls ):
                 logging.error( str(x) )
     return f
 
+#DONE
+def flatten( ls ):
+  return reduce( lambda a,b: a+b, ls, [] )
 
-
-@typecheck( str, str )
-@returns( (lambda a: isinstance(a,list) and all( isinstance(x,str) for x in a )), "[str]" )
+def do_select( document, selectors ):
+    opt = [document]
+    for sel in selectors.split():
+        opt = flatten([ _select(doc,sel) for doc in opt ])
+    return opt
+ 
 def _select( document, selector ):
     "jQuery style selectors"
-
-    if selector=='':
-        return [document]
 
     if selector=='[innerHTML]':
         try:
             return [''.join( str(c) for c in Soup(document).contents[0].contents )]
         except Exception, x:
-            print x
+            logging.error( str(x) )
             return []       
 
-    if ' ' in selector:
-        this,next = selector.split(' ',1)
-    else:
-        this,next = selector,''
+    elif re.match("^\\[[a-zA-Z]+\\]$",this):
+        return [str( Soup(document).contents[0][this[1:-1]] )]
 
-
-    if re.match('^![0-9]+$',this):
+    elif re.match('^![0-9]+$',selector):
         try:
-            return _select( str(Soup(document).contents[0].contents[int(this[1:])]) ,next)
+            return [ str(Soup(document).contents[0].contents[int(selector[1:])]) ]
         except IndexError,x:
             print x
             return []
-    elif re.match("^\\[[a-zA-Z]+\\]$",this):
-        return [str( Soup(document).contents[0][this[1:-1]] )]
-    else:
-        tag     = re.compile('[a-zA-Z0-9]+')
-        hasattr = re.compile('\\[(?P<attr>[a-zA-Z]+)\\]')
-        rgxattr = re.compile('\\[(?P<attr>[a-zA-Z]+)(?P<op>[^\\"]+)(?P<pat>[^\\]]+)\\]')
-        id      = re.compile('#(?P<id>[_a-zA-Z0-9]+)')
-        cls     = re.compile('\\.(?P<class>[_a-zA-Z0-9]+)')
-        ind     = re.compile('![0-9]+')
 
-        m = tag.match(this)
-        if m:
-            name = this[ :m.end() ]
-            this = this[ m.end(): ]
-        else:
-            if this.startswith('*'):
-                this = this[1:]
-            name = True
-        
+    else:
+    
+        ops = [
+            [re.compile('(?P<name>[a-zA-Z0-9]+)'), (lambda g: {'$name$': g['name']}) ],
+            [re.compile('\\[(?P<attr>[a-zA-Z]+)\\]'), (lambda g: {g['attr']: True}) ],
+            [re.compile('\\[(?P<attr>[a-zA-Z]+)(?P<op>[^\\"]+)(?P<pat>[^\\]]+)\\]') ],
+            (lambda g: 
+                { g['attr']: (lambda a: a and a==pat) }                    if g['op']=='=' else
+                { g['attr']: (lambda a: a and pat in a.split(' ')) }       if g['op']=='~=' else
+                { g['attr']: (lambda a: a and a.startswith(pat)) }         if g['op']=='^=' else
+                { g['attr']: (lambda a: a and a.endswith(pat)) }           if g['op']=='$=' else
+                { g['attr']: (lambda a: a and pat in a.split('-')) }       if g['op']=='|=' else
+                {}
+            )],
+            [re.compile('#(?P<id>[_a-zA-Z0-9]+)'), (lambda g: {'id': g['id']}) ],
+            [re.compile('\\.(?P<class>[_a-zA-Z0-9]+)'), (lambda g: {'class': g['class']}) ],
+        ]
+
         kwargs = {}
-        while this!="":
-            if hasattr.match(this):
-                m = hasattr.match(this)   
-                kwargs[m.group('attr')] = True
-            elif id.match(this):      
-                m = id.match(this)
-                kwargs["id"] = m.group('id')
-            elif cls.match(this):
-                m = cls.match(this)
-                kwargs["class"] = cls.match(this).group('class')
-            elif rgxattr.match(this):
-                m    = rgxattr.match(this)
-                attr = m.group('attr')
-                op   = m.group('op')
-                pat  = str(json.loads(m.group('pat')))
- 
-                if not isinstance(pat,str): 
-                    raise Exception("Invalid Selector: %s" % this)
-                if op=='=':    kwargs[attr] = (lambda a: a and a==pat)
-                elif op=='~=': kwargs[attr] = (lambda a: a and pat in a.split(' '))
-                elif op=='^=': kwargs[attr] = (lambda a: a and a.startswith(pat) )
-                elif op=='$=': kwargs[attr] = (lambda a: a and a.endswith(pat) )
-                elif op=='|=': kwargs[attr] = (lambda a: a and pat in a.split('-'))
-                else: raise Exception("Invalid Selector: %s" % this)
-            else:   
-                raise Exception("Invalid Selector: %s" % this)
-            this = this[ m.end(): ]
+        while selector!='':
+          matched = [rgx.match(selector),app for rgx,app in ops if rgx.match(selector)]
+          assert len(matched)==1, ("Invalid Selector: %s" % selector)
+          m,app = matched[0]
+          kwargs.update( app(m.groups()) )
+          selector = selector[ m.end(): ] 
+        
+        if "$name$" in kwargs:
+            name = kwargs['$name$']
+            del kwargs['$name$']
+        else:
+            name = True
+
         results = Soup(document).findAll( name, kwargs )         
-        return reduce(lambda a,b: a+b, (_select(str(o),next) for o in Soup(document).findAll( name, kwargs )), [] )
+        return [str(o) for o in Soup(document).findAll( name, kwargs ) ]
 
 
 
