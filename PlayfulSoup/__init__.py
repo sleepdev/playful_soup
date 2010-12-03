@@ -109,7 +109,6 @@ def _select( document, selector ):
         return [str(o) for o in Soup(document).findAll( name, kwargs )]
 
 
-#DONE
 
 def extract( selectors ):
     "extract data from document and add to context"
@@ -118,20 +117,24 @@ def extract( selectors ):
         new_context.update( context )
         for k in selectors:
             if isinstance(selectors[k],str):
-                new_context[k] = select(document,selectors[k])
+                sls = [ selectors[k] ]                  
             else:
-                for v in selectors[k]:
-                    if v == None: continue
-                    found = select(document,v)    
-                    if len(found)>= 1:
-                        new_context[k] = found
-                        break
+                sls = selectors[k]
 
-            if next_context[k].startswith('/'):
-                url = next_context[k]
-                if '://' not in url:
-                    assert 'base_url' in context
-                    next_context[k] = urlparse.urljoin( context['base_url'][0], url ) 
+            for v in sls:
+                if v == None: continue
+                found = select(document,v)
+
+                #convert relative locators to absolute
+                if v.endswith(' [href]') or v.endswith(' [src]'):
+                  for i in xrange(len(found)):
+                    if '://' not in found[i]:
+                      assert 'base_url' in context
+                      found[i] = urlparse.urljoin( context['base_url'][0], found[i] )                    
+
+                if len(found)>= 1:
+                    new_context[k] = found
+                    break
 
         commands[0]( new_context, document, commands[1:] )
     return f
@@ -146,6 +149,7 @@ def follow( selector ):
     return f
 
 
+#DONE
 
 def commit( post, format ):
     "format and validate data before submitting to a data sink"
