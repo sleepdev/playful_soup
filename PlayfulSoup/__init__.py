@@ -47,10 +47,17 @@ def jumpto( *urls ):
                 logging.error( str(x) )
     return f
 
-def select( document, selectors ):
+def select( context, document, selectors ):
     opt = [document]
     for sel in selectors.split():
         opt = reduce(lambda a,b: a+b, [ _select(doc,sel) for doc in opt ], [])
+
+    #convert relative locators to absolute
+    if selectors.endswith(' [href]') or selectors.endswith(' [src]'):
+        for i in xrange(len(opt)):
+            if '://' not in opt[i]:
+                assert 'base_url' in context
+                opt[i] = urlparse.urljoin( context['base_url'][0], opt[i] )  
     return opt
  
 def _select( document, selector ):
@@ -82,7 +89,7 @@ def _select( document, selector ):
         ops = [
             [re.compile('(?P<name>[-_a-zA-Z0-9]+)'), (lambda g: {'$name$': g['name']}) ],
             [re.compile('\\[(?P<attr>[a-zA-Z]+)\\]'), (lambda g: {g['attr']: True}) ],
-            [re.compile('\\[(?P<attr>[a-zA-Z]+)(?P<op>[^\\"]+)(?P<pat>[^\\]]+)\\]'),
+            [re.compile('\\[(?P<attr>[a-zA-Z]+)(?P<op>[^\\"]+)"(?P<pat>[^\\"]+)"\\]'),
             (lambda g: 
                 { g['attr']: (lambda a: a and a==g['pat']) }               if g['op']=='=' else
                 { g['attr']: (lambda a: a and g['pat'] in a.split(' ')) }  if g['op']=='~=' else
@@ -127,7 +134,7 @@ def extract( selectors ):
 
             for v in sls:
                 if v == None: continue
-                found = select(document,v)
+                found = select(context,document,v)
 
                 #convert relative locators to absolute
                 if v.endswith(' [href]') or v.endswith(' [src]'):
@@ -148,7 +155,7 @@ def extract( selectors ):
 def follow( selector ):
     "follow link to new document"
     def f( context, document, commands ):
-        for url in select( document, selector ):
+        for url in select( context, document, selector ):
            jumpto(url)(context,document,commands)
     return f
 
@@ -176,7 +183,7 @@ def commit( post, format ):
             post( **kwargs )
         except Exception,x:
             logging.error( str(x) )
-            print "Invalid Commit: ", context['url'][0]
+            logging.error( "Invalid Commit: "+ context['url'][0] )
     return f
 
 
