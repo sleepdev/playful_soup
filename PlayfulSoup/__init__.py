@@ -47,14 +47,10 @@ def jumpto( *urls ):
                 logging.error( str(x) )
     return f
 
-#DONE
-def flatten( ls ):
-  return reduce( lambda a,b: a+b, ls, [] )
-
-def do_select( document, selectors ):
+def select( document, selectors ):
     opt = [document]
     for sel in selectors.split():
-        opt = flatten([ _select(doc,sel) for doc in opt ])
+        opt = reduce(lambda a,b: a+b, [ _select(doc,sel) for doc in opt ], [])
     return opt
  
 def _select( document, selector ):
@@ -67,8 +63,8 @@ def _select( document, selector ):
             logging.error( str(x) )
             return []       
 
-    elif re.match("^\\[[a-zA-Z]+\\]$",this):
-        return [str( Soup(document).contents[0][this[1:-1]] )]
+    elif re.match("^\\[[a-zA-Z]+\\]$",selector):
+        return [str( Soup(document).contents[0][selector[1:-1]] )]
 
     elif re.match('^![0-9]+$',selector):
         try:
@@ -82,7 +78,7 @@ def _select( document, selector ):
         ops = [
             [re.compile('(?P<name>[a-zA-Z0-9]+)'), (lambda g: {'$name$': g['name']}) ],
             [re.compile('\\[(?P<attr>[a-zA-Z]+)\\]'), (lambda g: {g['attr']: True}) ],
-            [re.compile('\\[(?P<attr>[a-zA-Z]+)(?P<op>[^\\"]+)(?P<pat>[^\\]]+)\\]') ],
+            [re.compile('\\[(?P<attr>[a-zA-Z]+)(?P<op>[^\\"]+)(?P<pat>[^\\]]+)\\]'),
             (lambda g: 
                 { g['attr']: (lambda a: a and a==pat) }                    if g['op']=='=' else
                 { g['attr']: (lambda a: a and pat in a.split(' ')) }       if g['op']=='~=' else
@@ -97,10 +93,10 @@ def _select( document, selector ):
 
         kwargs = {}
         while selector!='':
-          matched = [rgx.match(selector),app for rgx,app in ops if rgx.match(selector)]
+          matched = [(rgx.match(selector),app) for rgx,app in ops if rgx.match(selector)]
           assert len(matched)==1, ("Invalid Selector: %s" % selector)
           m,app = matched[0]
-          kwargs.update( app(m.groups()) )
+          kwargs.update( app(m.groupdict()) )
           selector = selector[ m.end(): ] 
         
         if "$name$" in kwargs:
@@ -110,24 +106,23 @@ def _select( document, selector ):
             name = True
 
         results = Soup(document).findAll( name, kwargs )         
-        return [str(o) for o in Soup(document).findAll( name, kwargs ) ]
+        return [str(o) for o in Soup(document).findAll( name, kwargs )]
 
 
+#DONE
 
-@typecheck(dict)
 def extract( selectors ):
     "extract data from document and add to context"
-    @typecheck(dict,str,list)
     def f( context, document, commands ):
         new_context = {}
         new_context.update( context )
         for k in selectors:
             if isinstance(selectors[k],str):
-                new_context[k] = _select(document,selectors[k])
+                new_context[k] = select(document,selectors[k])
             else:
                 for v in selectors[k]:
                     if v == None: continue
-                    found = _select(document,v)    
+                    found = select(document,v)    
                     if len(found)>= 1:
                         new_context[k] = found
                         break
@@ -143,22 +138,17 @@ def extract( selectors ):
 
 
 
-@typecheck(str)
 def follow( selector ):
     "follow link to new document"
-    @typecheck(dict,str,list)
     def f( context, document, commands ):
-        for url in _select( document, selector ):
+        for url in select( document, selector ):
            jumpto(url)(context,document,commands)
     return f
 
 
 
-
-@typecheck(types.FunctionType,str)
 def commit( post, format ):
     "format and validate data before submitting to a data sink"
-    @typecheck(dict,str,list)
     def f( context, document, commands ):
         assert len(commands)==0
         try:
@@ -184,7 +174,7 @@ def commit( post, format ):
     return f
 
 
-@typecheck(list)
+
 def crawl( site ):
   site[0]( {}, "", site[1:] )
 
