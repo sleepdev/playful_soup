@@ -53,18 +53,6 @@ def jumpto( *urls ):
                 logging.error( str(x) )
     return f
 
-def select( context, document, selectors ):
-    opt = [document]
-    for sel in selectors.split():
-        opt = reduce(lambda a,b: a+b, [ _select(doc,sel) for doc in opt ], [])
-
-    #convert relative locators to absolute
-    if selectors.endswith(' [href]') or selectors.endswith(' [src]'):
-        for i in xrange(len(opt)):
-            if '://' not in opt[i]:
-                assert 'base_url' in context
-                opt[i] = urlparse.urljoin( context['base_url'][0], opt[i] )  
-    return opt
  
 def _select( document, selector ):
     "jQuery style selectors"
