@@ -4,8 +4,6 @@ import json
 import logging
 import re
 import time
-import tornado.escape
-import tornado.httpclient
 import types
 import urlparse
 
@@ -24,8 +22,16 @@ The second application is given 3 arguments.
 """
 
 
+import urllib2
 
-utf8 = tornado.escape.utf8
+def utf8(value):
+    if value is None:
+        return None
+    if isinstance(value, unicode):
+        return value.encode("utf-8")
+    assert isinstance(value, bytes)
+    return value
+
 Soup = BeautifulSoup.BeautifulSoup
 
 
@@ -41,9 +47,9 @@ def jumpto( *urls ):
             ctx['base_url'] = [parsed_url.scheme + '://' + parsed_url.netloc]
             try:
                 time.sleep(1)
-                doc = tornado.httpclient.HTTPClient().fetch(url).body
+                doc = urllib2.urlopen(url).read() 
                 commands[0]( ctx, doc, commands[1:] )
-            except tornado.httpclient.HTTPError, x:
+            except urllib2.HTTPError, x:
                 logging.error( str(x) )
     return f
 
@@ -188,8 +194,8 @@ def commit( post, format ):
 
 
 
-def crawl( site ):
-  site[0]( {}, "", site[1:] )
+def crawl( site, **kargs ):
+  site[0]( kargs, "", site[1:] )
 
 
 
