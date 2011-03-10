@@ -53,6 +53,14 @@ def jumpto( *urls ):
                 logging.error( str(x) )
     return f
 
+
+
+def select( selector ):
+    def f( context, document, commands ):
+        for doc in _select(document,selector):
+            commands[0]( context, doc, commands[1:] )
+    return f
+
  
 def _select( document, selector ):
     "jQuery style selectors"
@@ -120,31 +128,11 @@ def extract( selectors ):
     def f( context, document, commands ):
         new_context = {}
         new_context.update( context )
-        for k in selectors:
-            if isinstance(selectors[k],str):
-                sls = [ selectors[k] ]                  
-            else:
-                sls = selectors[k]
-
-            for v in sls:
-                if v == None: continue
-                found = select(context,document,v)
-
-                #convert relative locators to absolute
-                if v.endswith(' [href]') or v.endswith(' [src]'):
-                  for i in xrange(len(found)):
-                    if '://' not in found[i]:
-                      assert 'base_url' in context
-                      found[i] = urlparse.urljoin( context['base_url'][0], found[i] )                    
-
-                if len(found)>= 1:
-                    new_context[k] = found
-                    break
-
+        for k,v in selectors.items():
+           for doc in _select(context,document,v):
+               new_context[k] = str(doc)
         commands[0]( new_context, document, commands[1:] )
     return f
-
-
 
 def follow( selector ):
     "follow link to new document"
