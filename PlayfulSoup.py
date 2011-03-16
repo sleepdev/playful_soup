@@ -7,9 +7,51 @@ import time
 import types
 import urlparse
 
+
+def base_url( url ):
+    return urlparse.urlparse( url )[2]
+
+def fetch_url( url ):
+    pass
+
+
+def crawl( url, *cps ):
+    html = fetch( url )
+    context = {
+        'ps_url' : ps_url,
+        'ps_cps' : cps[1:],
+    }
+    fetch( context,  )
+
+    
+def follow( selector ):
+    def f( **context ): pass
+    return f
+
+
+def extract( **patterns ):
+    ( **context ): 
+
+def commit( **context ): pass
+
 """
+crawl(
+  "base url",
+  follow( "selector" ),
+  extract( key="selector" ),
+  commit( callback )
+)
+
+State:
+  ps_url : str
+  ps_html : str
+  ps_cont : [ str -> env ]
+  * : str
+
+
+
+
 Commands
-  jumpto   - start a crawler at the given urls (FIRST) 
   follow   - select and follow links from body text
   extract  - select and save data from page text
   commit   - validate and send data (LAST)
